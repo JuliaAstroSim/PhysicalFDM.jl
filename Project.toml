@@ -1,0 +1,13 @@
+name = "PhysicalFDM"
+uuid = "4fd04e27-7767-4ec9-b70f-09a3b509a447"
+authors = ["islent <leoislent@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+PaddedViews = "5432bcbf-9aad-5242-b902-cca2824c8663"
+PhysicalMeshes = "97d9904f-034f-4fb7-aeaa-03a173434233"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Tullio = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
