@@ -302,12 +302,10 @@ end
 
 #TODO: a better way to conv
 
-### Precompile
-@setup_workload begin
-    @compile_workload begin
-        diff_mat(3,1)
-        diff_mat(3,2)
-    end
-end
+
+
+
+
+include("precompile.jl")
 
 end # module PhysicalFDM
