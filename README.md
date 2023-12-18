@@ -36,9 +36,7 @@ This package is extracted from [AstroNbodySim.jl](https://github.com/JuliaAstroS
 ### Differencing
 
 Central differencing scheme is defined as
-$$
-\left(\frac{\partial u}{\partial x}\right)_{i, j}=\frac{1}{2 \Delta x}\left(u_{i+1, j}-u_{i-1, j}\right)+O(\Delta x)
-$$
+$$\left(\frac{\partial u}{\partial x}\right)_{i, j}=\frac{1}{2 \Delta x}\left(u_{i+1, j}-u_{i-1, j}\right)+O(\Delta x)$$
 Suppose we have an 1D data, and $\delta x = 5$:
 ```julia
 julia> d1 = [1,2,1]
@@ -78,16 +76,11 @@ julia> grad_central(1, 1, 1, d3)
 ### FDM solver
 
 #### Poisson equation
-$$
-\delta u = f
-$$
+$$\delta u = f$$
 can be discretized to
-$$
-\frac{u_{i+1}-2 u_{i}+u_{i-1}}{\Delta x^{2}}=f_{i}, i = 1, 2, \cdots, N
-$$
+$$\frac{u_{i+1}-2 u_{i}+u_{i-1}}{\Delta x^{2}}=f_{i}, i = 1, 2, \cdots, N$$
 In Dirichlet boundary conditions,
-$$
-\frac{1}{\Delta x^2} \begin{pmatrix}
+$$\frac{1}{\Delta x^2} \begin{pmatrix}
         -2 &      1 &      0 & \cdots & \cdots &      0 \\
         1 &     -2 &      1 &      0 & \cdots & \vdots \\
         0 &      1 &     -2 &      1 & \cdots & \vdots \\
@@ -101,13 +94,10 @@ $$
 \end{pmatrix}
 = \begin{pmatrix}
     f_1 \\ f_2 \\ \vdots \\ \vdots \\ \vdots \\ f_{N-1} \\ f_N
-\end{pmatrix}
-$$
+\end{pmatrix}$$
 
 The Poisson problem is converted to solving a matrix equation
-$$
-\mathbf{A} \cdot \mathbf{u} = \mathbf{f}
-$$
+$$\mathbf{A} \cdot \mathbf{u} = \mathbf{f}$$
 
 `PhysicalFDM.jl` is here to provide user-friendly tools to generate `\mathbf{A}` matrix.
 
