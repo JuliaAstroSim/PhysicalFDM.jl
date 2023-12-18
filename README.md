@@ -1,5 +1,7 @@
 # PhysicalFDM.jl
 
+[![codecov](https://codecov.io/gh/JuliaAstroSim/PhysicalFDM.jl/graph/badge.svg?token=dFTWGV2lBM)](https://codecov.io/gh/JuliaAstroSim/PhysicalFDM.jl)
+
 Finite Differencing Method
 
 WARNING: *This package is under development!!!*
