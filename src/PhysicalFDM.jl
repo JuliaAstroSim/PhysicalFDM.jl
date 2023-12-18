@@ -5,6 +5,7 @@ using DocStringExtensions
 using PrecompileTools
 
 using SparseArrays
+using StaticArrays
 using OffsetArrays
 using PaddedViews
 using Tullio
@@ -12,7 +13,8 @@ using Tullio
 export diff_mat
 export diff_mat2_x, diff_mat2_y, diff_mat2
 export diff_mat3_x, diff_mat3_y, diff_mat3_z, diff_mat3
-export diff_central_x, diff_central_y, diff_central_z, diff_central
+export diff_central_x, diff_central_y, diff_central_z
+export grad_central
 export laplace_conv
 
 """
@@ -24,7 +26,7 @@ Suppose the data is `[u,v,w]`, we want to smooth `v` by fitting a line (1 order 
 
 Using `Rational` type or `Sym` type of `SymPy` can get the exact coefficients. For example, `smooth_coef(Sym[0,1,2],2,1)` get `Sym[-3/2, 2, -1/2]`, which means the first order differential of `[u,v,w]` at `u` is `-1.5u+2v-0.5w`. Using this way can generate all data in <https://en.wikipedia.org/wiki/Finite_difference_coefficient>
 
-Author: Qian, Long. 2021-09 (龙潜，github: longqian95)
+Author: Qian, Long. 2021-09 (github: longqian95)
 
 # Examples
 
@@ -67,7 +69,7 @@ Generate differential matrix.
 - `boundary_order`: The order of the fitted polynomial for points determined by `boundary_points`.
 - `sparse`: If true, return sparse matrix instead of dense one.
 
-Author: Qian, Long. 2021-09 (龙潜，github: longqian95)
+Author: Qian, Long. 2021-09 (github: longqian95)
 
 # Examples
 
@@ -224,7 +226,7 @@ function diff_central_x(Δx, u::AbstractArray{T,2}, pad = zero(T)) where T
 end
 
 function diff_central_y(Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
-    LenX, LenY, LenZ = size(u)
+    LenX, LenY = size(u)
     kernel = diff_central_op(Δy)
     h = div(length(kernel), 2)
     d1 = PaddedView(pad, u, (1:LenX,     1-h:LenY+h))
@@ -259,17 +261,17 @@ function diff_central_z(Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
     return parent(out)
 end
 
-function diff_central(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
-    diff_central(Δx, u, pad)
+function grad_central(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
+    diff_central_x(Δx, u, pad)
 end
 
-function diff_central(Δx, Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
+function grad_central(Δx, Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
     dx = diff_central_x(Δx, u, pad)
     dy = diff_central_y(Δy, u, pad)
     return dx, dy
 end
 
-function diff_central(Δx, Δy, Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
+function grad_central(Δx, Δy, Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
     dx = diff_central_x(Δx, u, pad)
     dy = diff_central_y(Δy, u, pad)
     dz = diff_central_z(Δz, u, pad)
@@ -298,12 +300,7 @@ function laplace_conv_op(Δx, Δy, Δz)
      0    0    0], dims = 3))
 end
 
-function laplace_conv(a, Δ...)
-    kernel = laplace_conv_op(Δ...)
-    return imfilter(a, kernel, Fill(0))
-end
-
-
+#TODO: a better way to conv
 
 ### Precompile
 @setup_workload begin
