@@ -37,7 +37,9 @@ This package is extracted from [AstroNbodySim.jl](https://github.com/JuliaAstroS
 
 Central differencing scheme is defined as
 
-$$\left(\frac{\partial u}{\partial x}\right)_{i, j}=\frac{1}{2 \Delta x}\left(u_{i+1, j}-u_{i-1, j}\right)+O(\Delta x)$$
+$$
+\left(\frac{\partial u}{\partial x}\right)_{i, j}=\frac{1}{2 \Delta x}\left(u_{i+1, j}-u_{i-1, j}\right)+O(\Delta x)
+$$
 
 Suppose we have an 1D data, and $\delta x = 5$:
 ```julia
