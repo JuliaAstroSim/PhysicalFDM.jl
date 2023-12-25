@@ -3,6 +3,7 @@ module PhysicalFDM
 using LinearAlgebra
 using DocStringExtensions
 using PrecompileTools
+using Reexport
 
 using SparseArrays
 using StaticArrays
@@ -10,12 +11,18 @@ using OffsetArrays
 using PaddedViews
 using Tullio
 
+@reexport using AstroSimBase
+@reexport using PhysicalMeshes
+
 export diff_mat
 export diff_mat2_x, diff_mat2_y, diff_mat2
 export diff_mat3_x, diff_mat3_y, diff_mat3_z, diff_mat3
 export diff_central_x, diff_central_y, diff_central_z
 export grad_central
-export laplace_conv
+export solve_matrix_equation
+export fdm_poisson
+
+# export laplace_conv
 
 """
 $(TYPEDSIGNATURES)
@@ -64,7 +71,7 @@ Generate differential matrix.
 - `lpoints`: Number of points at left to the target point, which differential is calculated by the fitted polynomial.
 - `rpoints`: Number of points at right to the target point. If `lpoints==rpoints`, then the differential is estimated as central finite difference. If `lpoints==0`, then it is normal forward finite difference. If `rpoints==0`, then it is backward finite difference.
 - `fitting_order`: The order of the fitted polynomial for estimating differential.
-- `boundary`: Boundary condition. Can be `:Dirichlet`(boundary value is zero), `:Periodic`(assume data is periodic), `:Extrapolation`(boundary value is extrapolated according to `boundary_points` and `boundary_order`), `:None`(not deal with boundary, will return non-square matrix).
+- `boundary`: Boundary condition. Can be `Dirichlet()`(boundary value is zero), `Periodic()`(assume data is periodic), `:Extrapolation`(boundary value is extrapolated according to `boundary_points` and `boundary_order`), `:None`(not deal with boundary, will return non-square matrix).
 - `boundary_points`: Number of points for fitting polynomial to estimate differential at boundary. Normally it should not be much less than `points`, otherwise sometimes the current point may not be used to estimate the differential.
 - `boundary_order`: The order of the fitted polynomial for points determined by `boundary_points`.
 - `sparse`: If true, return sparse matrix instead of dense one.
@@ -81,7 +88,7 @@ diff_mat(k,1;points=2,lpoints=0)*x #do the normal 1st order forward differential
 diff_mat(k,1;lpoints=1,rpoints=0)*x #do the 1st order backward differential (x[n-1]-x[n]).
 ```
 """
-function diff_mat(n, order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, lpoints=div(points,2), rpoints=points-lpoints-1, fitting_order=lpoints+rpoints, boundary=:Dirichlet, boundary_points=lpoints+rpoints+1, boundary_order=boundary_points-1, sparse=false)
+function diff_mat(n, order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, lpoints=div(points,2), rpoints=points-lpoints-1, fitting_order=lpoints+rpoints, boundary=Dirichlet(), boundary_points=lpoints+rpoints+1, boundary_order=boundary_points-1, sparse=false)
     n<lpoints+rpoints+1 && throw(ArgumentError("matrix size $n must be greater than or equal to lpoints+rpoints+1 ($lpoints+$rpoints+1)"))
     x=-lpoints:rpoints
     dt=dt^order
@@ -93,7 +100,7 @@ function diff_mat(n, order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, l
         diagm1=diagm
         zeros1=zeros
     end
-    if boundary == :Dirichlet || boundary == :Vacuum # in the vacuum case, we manually compute solution on the boundaries
+    if boundary == Dirichlet() || boundary == Vacuum() # in the vacuum case, we manually compute solution on the boundaries
         m=diagm1((x[i]=>v[i]*ones(T,n-abs(x[i])) for i=eachindex(x))...)
     elseif boundary isa Periodic
         m=zeros1(T,n,n)
@@ -126,38 +133,38 @@ diff_vec(order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, lpoints=div(p
 
 
 #generate given order differential matrix for a vector which is expanded from row*col matrix
-function diff_mat2_x(row,col,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=:Dirichlet, sparse=false)
+function diff_mat2_x(row,col,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=Dirichlet(), sparse=false)
     t=diff_mat(col,order; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
     m=kron(t,I(row))
     return m
 end
-function diff_mat2_y(row,col,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=:Dirichlet, sparse=false)
+function diff_mat2_y(row,col,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=Dirichlet(), sparse=false)
     t=diff_mat(row,order; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
     m=kron(I(col),t)
     return m
 end
 
 #2D Δ(Laplacian) operator
-function delta_mat2(row,col; T=Float64, dt=one(T), points=3, boundary=:Dirichlet, sparse=false)
+function delta_mat2(row,col; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat2_x(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat2_y(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
 end
 
-function delta_mat2(row,col,Δx,Δy; T=Float64, dt=one(T), points=3, boundary=:Dirichlet, sparse=false)
+function delta_mat2(row,col,Δx,Δy; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat2_x(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx^2+diff_mat2_y(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy^2
 end
 
 #generate given order differential matrix for a vector which is expanded from row*col*page tensor
-function diff_mat3_x(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=:Dirichlet, sparse=false)
+function diff_mat3_x(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=Dirichlet(), sparse=false)
     t=diff_mat(col,order; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
     m=kron(I(page),kron(t,I(row)))
     return m
 end
-function diff_mat3_y(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=:Dirichlet, sparse=false)
+function diff_mat3_y(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=Dirichlet(), sparse=false)
     t=diff_mat(row,order; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
     m=kron(I(col*page),t) #or: m=kron(I(page),kron(I(col),t))
     return m
 end
-function diff_mat3_z(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=:Dirichlet, sparse=false)
+function diff_mat3_z(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(order+1,2)+1, boundary=Dirichlet(), sparse=false)
     t=diff_mat(page,order; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
     m=kron(t,I(row*col)) #or: m=kron(kron(t,I(row)),I(col))
     return m
@@ -165,29 +172,29 @@ end
 
 
 #3D Δ(Laplacian) operator
-function delta_mat3(row,col,page; T=Float64, dt=one(T), points=3, boundary=:Dirichlet, sparse=false)
+function delta_mat3(row,col,page; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat3_x(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat3_y(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat3_z(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
 end
 
-function delta_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, boundary=:Dirichlet, sparse=false)
+function delta_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat3_x(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx^2+diff_mat3_y(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy^2+diff_mat3_z(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δz^2
 end
 
-function conv(kernel::AbstractArray{T,1}, d::AbstractArray{T,1}, boundary=:Dirichlet; fill = zero(T)) where T
+function conv(kernel::AbstractArray{T,1}, d::AbstractArray{T,1}, boundary=Dirichlet(); fill = zero(T)) where T
     h = div(length(kernel), 2)
     d1 = PaddedView(fill, d, (1-h:length(d)+h,))
     @tullio out[x] := d1[x-i] * kernel[i]
     return out
 end
 
-function conv(kernel::AbstractArray{T,2}, d::AbstractArray{T,2}, boundary=:Dirichlet; fill = zero(T)) where T
+function conv(kernel::AbstractArray{T,2}, d::AbstractArray{T,2}, boundary=Dirichlet(); fill = zero(T)) where T
     h=div.(size(kernel),2)
     d1=PaddedView(fill,d,(1-h[1]:size(d,1)+h[1],1-h[2]:size(d,2)+h[2]))
     @tullio out[x,y]:=d1[x-i,y-j]*kernel[i,j]
     return parent(out)
 end
 
-function conv(kernel::AbstractArray{T,3}, d::AbstractArray{T,3}, boundary=:Dirichlet; fill = zero(T)) where T
+function conv(kernel::AbstractArray{T,3}, d::AbstractArray{T,3}, boundary=Dirichlet(); fill = zero(T)) where T
     h=div.(size(kernel),2)
     d1=PaddedView(fill,d,size(d).+h.+h,h.+1)
     @tullio out[x,y,z]:=d1[x-i,y-j,z-k]*kernel[i,j,k]
@@ -300,11 +307,24 @@ function laplace_conv_op(Δx, Δy, Δz)
      0    0    0], dims = 3))
 end
 
+function solve_matrix_equation(A::Matrix, b, ::CPU)
+    # TODO: use left devision
+    # TODO: support units
+    return pinv(A) * b
+end
+
+function solve_matrix_equation(A::SparseMatrixCSC, b, ::CPU)
+    # TODO: support units
+    return A \ b
+end
+
+function solve_matrix_equation(A, b, ::GPU)
+    return cu(A) \ cu(b)
+end
+
 #TODO: a better way to conv
 
-
-
-
+include("Poisson.jl")
 
 include("precompile.jl")
 
