@@ -18,6 +18,7 @@ export diff_mat
 export diff_mat2_x, diff_mat2_y, diff_mat2
 export diff_mat3_x, diff_mat3_y, diff_mat3_z, diff_mat3
 export diff_central_x, diff_central_y, diff_central_z
+export grad_mat2, grad_mat3, laplace_mat2, laplace_mat3
 export grad_central
 export solve_matrix_equation
 export fdm_poisson
@@ -144,12 +145,21 @@ function diff_mat2_y(row,col,order=1; T=Float64, dt=one(T), points=2*div(order+1
     return m
 end
 
+#2D ∇(gradience) operator
+function grad_mat2(row,col; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+    return diff_mat2_x(row,col,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat2_y(row,col,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
+end
+
+function grad_mat2(row,col,Δx,Δy; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+    return diff_mat2_x(row,col,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx+diff_mat2_y(row,col,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy
+end
+
 #2D Δ(Laplacian) operator
-function delta_mat2(row,col; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+function laplace_mat2(row,col; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat2_x(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat2_y(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
 end
 
-function delta_mat2(row,col,Δx,Δy; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+function laplace_mat2(row,col,Δx,Δy; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat2_x(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx^2+diff_mat2_y(row,col,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy^2
 end
 
@@ -170,13 +180,21 @@ function diff_mat3_z(row,col,page,order=1; T=Float64, dt=one(T), points=2*div(or
     return m
 end
 
+#3D ∇(gradience) operator
+function grad_mat3(row,col,page; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+    return diff_mat3_x(row,col,page,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat3_y(row,col,page,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat3_z(row,col,page,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
+end
+
+function grad_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+    return diff_mat3_x(row,col,page,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx+diff_mat3_y(row,col,page,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy+diff_mat3_z(row,col,page,1; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δz
+end
 
 #3D Δ(Laplacian) operator
-function delta_mat3(row,col,page; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+function laplace_mat3(row,col,page; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat3_x(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat3_y(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)+diff_mat3_z(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)
 end
 
-function delta_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
+function laplace_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, boundary=Dirichlet(), sparse=false)
     return diff_mat3_x(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx^2+diff_mat3_y(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy^2+diff_mat3_z(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δz^2
 end
 
