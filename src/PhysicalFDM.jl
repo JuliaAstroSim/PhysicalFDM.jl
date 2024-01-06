@@ -21,8 +21,8 @@ export diff_central_x, diff_central_y, diff_central_z
 export grad_central
 export solve_matrix_equation
 export fdm_poisson
+export laplace
 
-# export laplace_conv
 
 """
 $(TYPEDSIGNATURES)
@@ -180,24 +180,24 @@ function delta_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, bo
     return diff_mat3_x(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δx^2+diff_mat3_y(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δy^2+diff_mat3_z(row,col,page,2; T=T,dt=dt,points=points,boundary=boundary,sparse=sparse)/Δz^2
 end
 
-function conv(kernel::AbstractArray{T,1}, d::AbstractArray{T,1}, boundary=Dirichlet(); fill = zero(T)) where T
-    h = div(length(kernel), 2)
+function conv(kernel::AbstractArray{S,1}, d::AbstractArray{T,1}, boundary=Dirichlet(); fill = zero(T)) where S where T
+    h = div.(length(kernel), 2)
     d1 = PaddedView(fill, d, (1-h:length(d)+h,))
-    @tullio out[x] := d1[x-i] * kernel[i]
+    @tullio out[x] := d1[x+i] * kernel[i]
     return out
 end
 
-function conv(kernel::AbstractArray{T,2}, d::AbstractArray{T,2}, boundary=Dirichlet(); fill = zero(T)) where T
+function conv(kernel::AbstractArray{S,2}, d::AbstractArray{T,2}, boundary=Dirichlet(); fill = zero(T)) where S where T
     h=div.(size(kernel),2)
     d1=PaddedView(fill,d,(1-h[1]:size(d,1)+h[1],1-h[2]:size(d,2)+h[2]))
-    @tullio out[x,y]:=d1[x-i,y-j]*kernel[i,j]
+    @tullio out[x,y]:=d1[x+i,y+j]*kernel[i,j]
     return parent(out)
 end
 
-function conv(kernel::AbstractArray{T,3}, d::AbstractArray{T,3}, boundary=Dirichlet(); fill = zero(T)) where T
+function conv(kernel::AbstractArray{S,3}, d::AbstractArray{T,3}, boundary=Dirichlet(); fill = zero(T)) where S where T
     h=div.(size(kernel),2)
     d1=PaddedView(fill,d,size(d).+h.+h,h.+1)
-    @tullio out[x,y,z]:=d1[x-i,y-j,z-k]*kernel[i,j,k]
+    @tullio out[x,y,z]:=d1[x+i,y+j,z+k]*kernel[i,j,k]
     return parent(out)
 end
 
@@ -307,6 +307,18 @@ function laplace_conv_op(Δx, Δy, Δz)
      0    0    0], dims = 3))
 end
 
+function laplace(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
+    return conv(laplace_conv_op(Δx), u)
+end
+
+function laplace(Δx, Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
+    return conv(laplace_conv_op(Δx, Δy), u)
+end
+
+function laplace(Δx, Δy, Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
+    return conv(laplace_conv_op(Δx, Δy, Δz), u)
+end
+
 function solve_matrix_equation(A::Matrix, b, ::CPU)
     # TODO: use left devision
     # TODO: support units
@@ -321,8 +333,6 @@ end
 function solve_matrix_equation(A, b, ::GPU)
     return cu(A) \ cu(b)
 end
-
-#TODO: a better way to conv
 
 include("Poisson.jl")
 
