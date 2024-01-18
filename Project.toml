@@ -16,9 +16,10 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Tullio = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
-DocStringExtensions = "0.8"
+DocStringExtensions = "0.8, 0.9"
 OffsetArrays = "1"
 PaddedViews = "0.5"
 PrecompileTools = "1"

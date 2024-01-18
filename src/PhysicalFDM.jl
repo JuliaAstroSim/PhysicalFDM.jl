@@ -10,9 +10,10 @@ using StaticArrays
 using OffsetArrays
 using PaddedViews
 using Tullio
+using Unitful
 
 @reexport using AstroSimBase
-@reexport using PhysicalMeshes
+using PhysicalMeshes
 
 export diff_mat
 export diff_mat2_x, diff_mat2_y, diff_mat2
@@ -22,7 +23,7 @@ export grad_mat2, grad_mat3, laplace_mat2, laplace_mat3
 export grad_central
 export solve_matrix_equation
 export fdm_poisson
-export laplace
+export laplace, laplace_conv_op
 
 
 """

@@ -41,7 +41,7 @@ end
 
 function fdm_poisson(m::AbstractMesh, dim::Val{2}, G::Number, ::VertexMode, Device::DeviceType, boundary::BoundaryCondition, sparse::Bool) # boundary: Periodic, Dirichlet
     config = m.config
-    A = delta_mat2((config.N .+ (1 + 2 * config.NG))..., ustrip.(getuLength(config.units), config.Δ)...;
+    A = laplace_mat2((config.N .+ (1 + 2 * config.NG))..., ustrip.(getuLength(config.units), config.Δ)...;
         boundary, sparse,
     )
     b = ustrip.(Array(m.rho .* (4 * pi * G)))[:]
@@ -81,7 +81,7 @@ function fdm_poisson(m::AbstractMesh, dim::Val{2}, G::Number, ::VertexMode, Devi
     NX = config.N[1] + 2 * config.NG + 1
     NY = config.N[2] + 2 * config.NG + 1
 
-    A = delta_mat2(NX, NY, ustrip.(getuLength(config.units), config.Δ)...;
+    A = laplace_mat2(NX, NY, ustrip.(getuLength(config.units), config.Δ)...;
         boundary, sparse,
     )
     b = ustrip.(Array(m.rho .* (4 * pi * G)))[:]
@@ -116,7 +116,7 @@ end
 function fdm_poisson(m::AbstractMesh, dim::Val{3}, G::Number, ::VertexMode, Device::DeviceType, boundary::BoundaryCondition, sparse::Bool) # boundary: Periodic, Dirichlet
     config = m.config
 
-    A = delta_mat3((config.N .+ (1 + 2 * config.NG))..., ustrip.(getuLength(config.units), config.Δ)...;
+    A = laplace_mat3((config.N .+ (1 + 2 * config.NG))..., ustrip.(getuLength(config.units), config.Δ)...;
         boundary, sparse,
     )
     b = ustrip.(Array(m.rho .* (4 * pi * G)))[:]
@@ -132,7 +132,7 @@ function fdm_poisson(m::AbstractMesh, dim::Val{3}, G::Number, ::VertexMode, Devi
     NY = config.N[2] + 2 * config.NG + 1
     NZ = config.N[3] + 2 * config.NG + 1
 
-    A = delta_mat3(NX, NY, NZ, ustrip.(getuLength(config.units), config.Δ)...;
+    A = laplace_mat3(NX, NY, NZ, ustrip.(getuLength(config.units), config.Δ)...;
         boundary, sparse,
     )
     b = ustrip.(Array(m.rho .* (4 * pi * G)))[:]
