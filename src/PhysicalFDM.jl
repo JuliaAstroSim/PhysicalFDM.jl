@@ -3,7 +3,6 @@ module PhysicalFDM
 using LinearAlgebra
 using DocStringExtensions
 using PrecompileTools
-using Reexport
 
 using SparseArrays
 using StaticArrays
@@ -11,8 +10,10 @@ using OffsetArrays
 using PaddedViews
 using Tullio
 using Unitful
+using CUDA
 
-@reexport using AstroSimBase
+using AstroSimBase
+using PhysicalParticles
 using PhysicalMeshes
 
 export diff_mat
