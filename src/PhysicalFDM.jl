@@ -202,23 +202,35 @@ end
 
 function conv(kernel::AbstractArray{S,1}, d::AbstractArray{T,1}, boundary=Dirichlet(); fill = zero(T)) where S where T
     h = div.(length(kernel), 2)
-    d1 = PaddedView(fill, d, (1-h:length(d)+h,))
+    CUDA.@allowscalar d1 = PaddedView(fill, Array(d), (1-h:length(d)+h,))
     @tullio out[x] := d1[x+i] * kernel[i]
-    return out
+    if d isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function conv(kernel::AbstractArray{S,2}, d::AbstractArray{T,2}, boundary=Dirichlet(); fill = zero(T)) where S where T
     h=div.(size(kernel),2)
-    d1=PaddedView(fill,d,(1-h[1]:size(d,1)+h[1],1-h[2]:size(d,2)+h[2]))
+    CUDA.@allowscalar d1=PaddedView(fill, Array(d), (1-h[1]:size(d,1)+h[1],1-h[2]:size(d,2)+h[2]))
     @tullio out[x,y]:=d1[x+i,y+j]*kernel[i,j]
-    return parent(out)
+    if d isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function conv(kernel::AbstractArray{S,3}, d::AbstractArray{T,3}, boundary=Dirichlet(); fill = zero(T)) where S where T
     h=div.(size(kernel),2)
-    d1=PaddedView(fill,d,size(d).+h.+h,h.+1)
+    CUDA.@allowscalar d1=PaddedView(fill, Array(d), size(d).+h.+h,h.+1)
     @tullio out[x,y,z]:=d1[x+i,y+j,z+k]*kernel[i,j,k]
-    return parent(out)
+    if d isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 # ∇(partial) difference operator
@@ -238,54 +250,78 @@ function diff_central_x(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
     LenX = length(u)
     kernel = diff_central_op(Δx)
     h = div(length(kernel), 2)
-    d1 = PaddedView(pad, u, (1-h:LenX+h,))
+    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1-h:LenX+h,))
     @tullio out[x]:=d1[x+i] * kernel[i]
-    return parent(out)
+    if u isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function diff_central_x(Δx, u::AbstractArray{T,2}, pad = zero(T)) where T
     LenX, LenY = size(u)
     kernel = diff_central_op(Δx)
     h = div(length(kernel), 2)
-    d1 = PaddedView(pad, u, (1-h:LenX+h,     1:LenY))
+    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1-h:LenX+h,     1:LenY))
     @tullio out[x,y]:=d1[x+i,y] * kernel[i]
-    return parent(out)
+    if u isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function diff_central_y(Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
     LenX, LenY = size(u)
     kernel = diff_central_op(Δy)
     h = div(length(kernel), 2)
-    d1 = PaddedView(pad, u, (1:LenX,     1-h:LenY+h))
+    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1:LenX,     1-h:LenY+h))
     @tullio out[x,y]:=d1[x,y+i] * kernel[i]
-    return parent(out)
+    if u isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function diff_central_x(Δx, u::AbstractArray{T,3}, pad = zero(T)) where T
     LenX, LenY, LenZ = size(u)
     kernel = diff_central_op(Δx)
     h = div(length(kernel), 2)
-    d1 = PaddedView(pad, u, (1-h:LenX+h,     1:LenY, 1:LenZ))
+    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1-h:LenX+h,     1:LenY, 1:LenZ))
     @tullio out[x,y,z]:=d1[x+i,y,z] * kernel[i]
-    return parent(out)
+    if u isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function diff_central_y(Δy, u::AbstractArray{T,3}, pad = zero(T)) where T
     LenX, LenY, LenZ = size(u)
     kernel = diff_central_op(Δy)
     h = div(length(kernel), 2)
-    d1 = PaddedView(pad, u, (1:LenX,     1-h:LenY+h, 1:LenZ))
+    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1:LenX,     1-h:LenY+h, 1:LenZ))
     @tullio out[x,y,z]:=d1[x,y+i,z] * kernel[i]
-    return parent(out)
+    if u isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function diff_central_z(Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
     LenX, LenY, LenZ = size(u)
     kernel = diff_central_op(Δz)
     h = div(length(kernel), 2)
-    d1 = PaddedView(pad, u, (1:LenX,     1:LenY, 1-h:LenZ+h))
+    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1:LenX,     1:LenY, 1-h:LenZ+h))
     @tullio out[x,y,z]:=d1[x,y,z+i] * kernel[i]
-    return parent(out)
+    if u isa CuArray
+        return cu(parent(out))
+    else
+        return parent(out)
+    end
 end
 
 function grad_central(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T

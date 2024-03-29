@@ -1,7 +1,7 @@
 name = "PhysicalFDM"
 uuid = "4fd04e27-7767-4ec9-b70f-09a3b509a447"
 authors = ["islent <leoislent@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 AstroSimBase = "c6a34d98-f626-4d8d-b450-a3f124eaada6"
@@ -20,13 +20,16 @@ Tullio = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+AstroSimBase = "0.1"
 CUDA = "5"
 DocStringExtensions = "0.8, 0.9"
 OffsetArrays = "1"
 PaddedViews = "0.5"
+PhysicalMeshes = "0.1"
 PhysicalParticles = "1"
 PrecompileTools = "1"
 SparseArrays = "1"
 StaticArrays = "1"
 Tullio = "0.3"
+Unitful = "1"
 julia = "1.6"
