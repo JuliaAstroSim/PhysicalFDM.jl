@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/JuliaAstroSim/PhysicalFDM.jl/graph/badge.svg?token=dFTWGV2lBM)](https://codecov.io/gh/JuliaAstroSim/PhysicalFDM.jl)
 
-Finite Differencing Method
+Finite Difference Method
 
 WARNING: *This package is under development!!!*
 
@@ -33,7 +33,7 @@ To test the Package:
 
 This package is extracted from [AstroNbodySim.jl](https://github.com/JuliaAstroSim/AstroNbodySim.jl). You may find more advanced examples there.
 
-### Differencing
+### Differencing schemes
 
 Central differencing scheme is defined as
 

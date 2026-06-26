@@ -1,7 +1,7 @@
 name = "PhysicalFDM"
 uuid = "4fd04e27-7767-4ec9-b70f-09a3b509a447"
 authors = ["islent <leoislent@gmail.com>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 AstroSimBase = "c6a34d98-f626-4d8d-b450-a3f124eaada6"
@@ -21,7 +21,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 AstroSimBase = "0.1"
-CUDA = "5"
+CUDA = "5, 6"
 DocStringExtensions = "0.8, 0.9"
 OffsetArrays = "1"
 PaddedViews = "0.5"
