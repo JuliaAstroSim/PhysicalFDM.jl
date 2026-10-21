@@ -22,7 +22,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 AstroSimBase = "0.1"
 CUDA = "5, 6"
-DocStringExtensions = "0.8, 0.9"
+DocStringExtensions = "0.8, 0.9, 0.10"
 OffsetArrays = "1"
 NNlib = "0.9"
 PaddedViews = "0.5"
