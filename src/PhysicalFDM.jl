@@ -8,7 +8,7 @@ using SparseArrays
 using StaticArrays
 using OffsetArrays
 using PaddedViews
-using Tullio
+using NNlib
 using Unitful
 using CUDA
 
@@ -201,36 +201,30 @@ function laplace_mat3(row,col,page,Δx,Δy,Δz; T=Float64, dt=one(T), points=3, 
 end
 
 function conv(kernel::AbstractArray{S,1}, d::AbstractArray{T,1}, boundary=Dirichlet(); fill = zero(T)) where S where T
-    h = div.(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(fill, Array(d), (1-h:length(d)+h,))
-    @tullio out[x] := d1[x+i] * kernel[i]
-    if d isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    h = div(length(kernel), 2)
+    # NNlib expects NHWC layout (W=1, H=len, C=1, N=1) with pad=(Wpad, Hpad)
+    # 用 Array(...) 强制 materialize, 避免 ReshapedArray 不支持 strides
+    d_arr = Array{Float64}(reshape(Float64.(d), 1, length(d), 1, 1))
+    k_arr = Array{Float64}(reshape(Float64.(kernel), 1, length(kernel), 1, 1))
+    out4 = NNlib.conv(d_arr, k_arr; pad=(0, h), flipped=true)
+    return vec(out4)
 end
 
 function conv(kernel::AbstractArray{S,2}, d::AbstractArray{T,2}, boundary=Dirichlet(); fill = zero(T)) where S where T
-    h=div.(size(kernel),2)
-    CUDA.@allowscalar d1=PaddedView(fill, Array(d), (1-h[1]:size(d,1)+h[1],1-h[2]:size(d,2)+h[2]))
-    @tullio out[x,y]:=d1[x+i,y+j]*kernel[i,j]
-    if d isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    h1, h2 = div.(size(kernel), 2)
+    d_arr = Array{Float64}(reshape(Float64.(d), size(d, 1), size(d, 2), 1, 1))
+    k_arr = Array{Float64}(reshape(Float64.(kernel), size(kernel, 1), size(kernel, 2), 1, 1))
+    out4 = NNlib.conv(d_arr, k_arr; pad=(h1, h2), flipped=true)
+    return dropdims(out4; dims=(3, 4))
 end
 
 function conv(kernel::AbstractArray{S,3}, d::AbstractArray{T,3}, boundary=Dirichlet(); fill = zero(T)) where S where T
-    h=div.(size(kernel),2)
-    CUDA.@allowscalar d1=PaddedView(fill, Array(d), size(d).+h.+h,h.+1)
-    @tullio out[x,y,z]:=d1[x+i,y+j,z+k]*kernel[i,j,k]
-    if d isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    h = div.(size(kernel), 2)
+    # 5D: (W, H, D, C, N)
+    d_arr = Array{Float64}(reshape(Float64.(d), size(d, 1), size(d, 2), size(d, 3), 1, 1))
+    k_arr = Array{Float64}(reshape(Float64.(kernel), size(kernel, 1), size(kernel, 2), size(kernel, 3), 1, 1))
+    out5 = NNlib.conv(d_arr, k_arr; pad=(h[1], h[2], h[3]), flipped=true)
+    return dropdims(out5; dims=(4, 5))
 end
 
 # ∇(partial) difference operator
@@ -246,82 +240,63 @@ function diff2_central_op(Δx)
     SVector{3}([1,-2,1]) / Δx / Δx
 end
 
-function diff_central_x(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
-    LenX = length(u)
-    kernel = diff_central_op(Δx)
-    h = div(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1-h:LenX+h,))
-    @tullio out[x]:=d1[x+i] * kernel[i]
-    if u isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
+function _diff_central_along_axis(Δ, u::AbstractArray{T,N}, axis::Int, pad=zero(T)) where {T,N}
+    kf = Float64.(diff_central_op(Δ))
+    # 把目标轴 permute 到第 1 轴, 做 1D conv, 再 permute 回来
+    perm = (axis, setdiff(1:N, axis)...)
+    u_perm = permutedims(u, perm)
+    u_f = Float64.(u_perm)
+    N_other = prod(size(u_f)[2:end])
+    # NNlib 1D conv: 沿 H 方向卷积, W=1, H=length_of_axis, N_other=channels
+    d4 = Array{Float64}(reshape(u_f, 1, size(u_f, 1), N_other, 1))
+    # kernel shape: (W_k=1, H_k=3, C_in=1, C_out=N_other) + groups=N_other 让每 channel 独立卷积
+    k4 = Array{Float64}(reshape(repeat(kf, N_other), 1, length(kf), 1, N_other))
+    out4 = NNlib.conv(d4, k4; pad=(0, 1), flipped=true, groups=N_other)
+    out_f = dropdims(out4; dims=(1, 4))
+    # 还原形状
+    out_shaped = N == 1 ? vec(out_f) : reshape(out_f, size(u_f))
+    inv_perm = invperm(perm)
+    result = permutedims(out_shaped, inv_perm)
+
+    # 应用非零 pad 到边界 (中央差分 kernel = [-1, 0, 1]/2/Δ)
+    # 左端: out[1, ...] = (u[2, ...] - pad) / 2Δ = kf[3] * u[2] + kf[1] * pad
+    # 右端: out[end, ...] = (pad - u[end-1, ...]) / 2Δ = -kf[1] * u[end-1] - kf[3] * pad
+    pad_f = Float64(pad)
+    if pad_f != 0.0
+        k1, _, k3 = kf[1], kf[2], kf[3]
+        if N == 1
+            result[1] = k1 * pad_f + k3 * u_f[2]
+            result[end] = k1 * u_f[end-1] + k3 * pad_f
+        else
+            selectdim(result, axis, 1)[:] .= k1 .* pad_f .+ k3 .* selectdim(u, axis, 2)
+            selectdim(result, axis, size(u, axis))[:] .= k1 .* selectdim(u, axis, size(u, axis) - 1) .+ k3 .* pad_f
+        end
     end
+    return result
+end
+
+function diff_central_x(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
+    return _diff_central_along_axis(Δx, u, 1, pad)
 end
 
 function diff_central_x(Δx, u::AbstractArray{T,2}, pad = zero(T)) where T
-    LenX, LenY = size(u)
-    kernel = diff_central_op(Δx)
-    h = div(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1-h:LenX+h,     1:LenY))
-    @tullio out[x,y]:=d1[x+i,y] * kernel[i]
-    if u isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    return _diff_central_along_axis(Δx, u, 1, pad)
 end
 
 function diff_central_y(Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
-    LenX, LenY = size(u)
-    kernel = diff_central_op(Δy)
-    h = div(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1:LenX,     1-h:LenY+h))
-    @tullio out[x,y]:=d1[x,y+i] * kernel[i]
-    if u isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    return _diff_central_along_axis(Δy, u, 2, pad)
 end
 
 function diff_central_x(Δx, u::AbstractArray{T,3}, pad = zero(T)) where T
-    LenX, LenY, LenZ = size(u)
-    kernel = diff_central_op(Δx)
-    h = div(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1-h:LenX+h,     1:LenY, 1:LenZ))
-    @tullio out[x,y,z]:=d1[x+i,y,z] * kernel[i]
-    if u isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    return _diff_central_along_axis(Δx, u, 1, pad)
 end
 
 function diff_central_y(Δy, u::AbstractArray{T,3}, pad = zero(T)) where T
-    LenX, LenY, LenZ = size(u)
-    kernel = diff_central_op(Δy)
-    h = div(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1:LenX,     1-h:LenY+h, 1:LenZ))
-    @tullio out[x,y,z]:=d1[x,y+i,z] * kernel[i]
-    if u isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    return _diff_central_along_axis(Δy, u, 2, pad)
 end
 
 function diff_central_z(Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
-    LenX, LenY, LenZ = size(u)
-    kernel = diff_central_op(Δz)
-    h = div(length(kernel), 2)
-    CUDA.@allowscalar d1 = PaddedView(pad, Array(u), (1:LenX,     1:LenY, 1-h:LenZ+h))
-    @tullio out[x,y,z]:=d1[x,y,z+i] * kernel[i]
-    if u isa CuArray
-        return cu(parent(out))
-    else
-        return parent(out)
-    end
+    return _diff_central_along_axis(Δz, u, 3, pad)
 end
 
 function grad_central(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
@@ -364,15 +339,15 @@ function laplace_conv_op(Δx, Δy, Δz)
 end
 
 function laplace(Δx, u::AbstractArray{T,1}, pad = zero(T)) where T
-    return conv(laplace_conv_op(Δx), u)
+    return conv(laplace_conv_op(Δx), u; fill=pad)
 end
 
 function laplace(Δx, Δy, u::AbstractArray{T,2}, pad = zero(T)) where T
-    return conv(laplace_conv_op(Δx, Δy), u)
+    return conv(laplace_conv_op(Δx, Δy), u; fill=pad)
 end
 
 function laplace(Δx, Δy, Δz, u::AbstractArray{T,3}, pad = zero(T)) where T
-    return conv(laplace_conv_op(Δx, Δy, Δz), u)
+    return conv(laplace_conv_op(Δx, Δy, Δz), u; fill=pad)
 end
 
 function solve_matrix_equation(A::Matrix, b, ::CPU)
