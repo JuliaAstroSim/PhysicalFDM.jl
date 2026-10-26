@@ -241,6 +241,15 @@ function diff2_central_op(Δx)
 end
 
 function _diff_central_along_axis(Δ, u::AbstractArray{T,N}, axis::Int, pad=zero(T)) where {T,N}
+    # 复数场：NNlib.conv 只支持实数，而中心差分核是实系数的线性算子，
+    # 对 a+ib 有 D(a+ib) = D(a) + i·D(b)，故实部/虚部分别走实数路径再重组。
+    # （v0.1 的 Tullio 实现天然支持复数；v0.2 改用 NNlib.conv 后丢了这一能力，
+    #   导致 grad_central(Δ..., ψ)（ψ 为复波函数）抛 InexactError。）
+    if T <: Complex
+        ur = _diff_central_along_axis(Δ, real.(u), axis, real(pad))
+        ui = _diff_central_along_axis(Δ, imag.(u), axis, imag(pad))
+        return complex.(ur, ui)
+    end
     kf = Float64.(diff_central_op(Δ))
     # 把目标轴 permute 到第 1 轴, 做 1D conv, 再 permute 回来
     perm = (axis, setdiff(1:N, axis)...)

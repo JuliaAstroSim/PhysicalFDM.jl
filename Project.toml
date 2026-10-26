@@ -1,7 +1,7 @@
 name = "PhysicalFDM"
 uuid = "4fd04e27-7767-4ec9-b70f-09a3b509a447"
 authors = ["islent <leoislent@gmail.com>"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 AstroSimBase = "c6a34d98-f626-4d8d-b450-a3f124eaada6"

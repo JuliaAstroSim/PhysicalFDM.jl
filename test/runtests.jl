@@ -240,6 +240,52 @@ d3[2,2,2] = 2
     @test grad_central(1, 1, 1, d3) == ([0.5 0.5 0.5; 0.0 0.0 0.0; -0.5 -0.5 -0.5;;; 0.5 1.0 0.5; 0.0 0.0 0.0; -0.5 -1.0 -0.5;;; 0.5 0.5 0.5; 0.0 0.0 0.0; -0.5 -0.5 -0.5], [0.5 0.0 -0.5; 0.5 0.0 -0.5; 0.5 0.0 -0.5;;; 0.5 0.0 -0.5; 1.0 0.0 -1.0; 0.5 0.0 -0.5;;; 0.5 0.0 -0.5; 0.5 0.0 -0.5; 0.5 0.0 -0.5], [0.5 0.5 0.5; 0.5 1.0 0.5; 0.5 0.5 0.5;;; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0;;; -0.5 -0.5 -0.5; -0.5 -1.0 -0.5; -0.5 -0.5 -0.5])
 end
 
+@testset "Gradience complex" begin
+    # 复数输入：v0.2 换成 NNlib.conv 后丢了复数支持（Float64.(u) 抛 InexactError），
+    # 这里锁定「实部/虚部分别做中心差分再重组」的行为。
+    Δ = 0.1
+    # 手写参考实现：中央差分，边界零填充
+    function ref_central(u, Δ, axis)
+        out = zeros(eltype(u), size(u)); n = size(u, axis)
+        for I in CartesianIndices(size(u))
+            im = Tuple(I); ia = im[axis] - 1; ib = im[axis] + 1
+            Jm = Base.setindex(im, ia, axis); Jb = Base.setindex(im, ib, axis)
+            um = ia >= 1 ? u[Jm...] : zero(eltype(u))
+            up = ib <= n ? u[Jb...] : zero(eltype(u))
+            out[I] = (up - um) / (2Δ)
+        end
+        out
+    end
+
+    # 1D
+    v1 = ComplexF64[1, 2+1im, 3-2im, 4]
+    @test grad_central(Δ, v1) ≈ ref_central(v1, Δ, 1)
+
+    # 2D
+    v2 = randn(ComplexF64, 6, 7)
+    g2 = grad_central(Δ, Δ, v2)
+    @test g2[1] ≈ ref_central(v2, Δ, 1)
+    @test g2[2] ≈ ref_central(v2, Δ, 2)
+
+    # 3D（WaveDM 的 ρv = Im(ψ* ∇ψ) 走的就是这条路径）
+    v3 = randn(ComplexF64, 8, 8, 8)
+    g3 = grad_central(Δ, Δ, Δ, v3)
+    @test g3[1] ≈ ref_central(v3, Δ, 1)
+    @test g3[2] ≈ ref_central(v3, Δ, 2)
+    @test g3[3] ≈ ref_central(v3, Δ, 3)
+
+    # 线性性：D(a+ib) == D(a) + i·D(b)（核是实系数）
+    a = randn(8, 8, 8); b = randn(8, 8, 8)
+    ga = grad_central(Δ, Δ, Δ, a); gb = grad_central(Δ, Δ, Δ, b)
+    gc = grad_central(Δ, Δ, Δ, a .+ im .* b)
+    @test gc[1] ≈ ga[1] .+ im .* gb[1]
+    @test gc[2] ≈ ga[2] .+ im .* gb[2]
+    @test gc[3] ≈ ga[3] .+ im .* gb[3]
+
+    # 非零 pad 同样作用于复数
+    @test grad_central(Δ, v1, -100.0)[1] ≈ (v1[2] - (-100)) / (2Δ)
+end
+
 @testset "Laplace" begin
     @test collect(PhysicalFDM.conv([1,2,3], [1,1,1])) == [5,6,3]
 
